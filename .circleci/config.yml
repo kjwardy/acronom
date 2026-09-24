@@ -1,0 +1,10 @@
+# version: 2.1
+
+# executors:
+#   default:
+#     working_directory: /home/circleci/project
+#     environment:
+#       DOCKER_BUILDKIT: "1"
+#     docker:
+#       - image: cimg/go:1.24.1-node
+

@@ -7,3 +7,5 @@ yarn-error.log*
 *.old
 /data
 /api/.env
+
+.DS_Store

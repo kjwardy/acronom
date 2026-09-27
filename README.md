@@ -12,7 +12,22 @@ A simple collaborative acronym glossary in Go with a React frontend and Postgres
 
 ## Development
 
-Run the API and frontend separately during development. The React development server automatically reloads frontend changes; restart the Go process after backend changes.
+Run PostgreSQL, the API, and the frontend separately during development. The React development server automatically reloads frontend changes; restart the Go process after backend changes.
+
+**Start PostgreSQL**
+
+The default API configuration works with this local Docker container:
+
+```sh
+docker run --name acronom-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_DB=acronom \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=password \
+  -d postgres:17-alpine
+```
+
+After creating the container, it can be stopped and started again with `docker stop acronom-postgres` and `docker start acronom-postgres`.
 
 **Start the API**
 
@@ -82,5 +97,9 @@ yarn build
 | --- | --- | --- | --- | --- |
 | `PORT` | No | `1323` | `8080` | Port used by the API server |
 | `DEBUG` | No | `false` | `true` | Enable Echo debug mode |
+| `POSTGRES_ADDR` | No | `localhost:5432` | `database:5432` | PostgreSQL server address in `host:port` format |
+| `POSTGRES_DATABASE` | No | `acronom` | `acronom` | PostgreSQL database name |
+| `POSTGRES_USER` | No | `postgres` | `acronom` | PostgreSQL user |
+| `POSTGRES_PASS` | No | `password` | | PostgreSQL password |
 
 More advanced deployment guides can be found on the [Advanced Deployment](./docs/deployments/advanced-deployment.md) page.

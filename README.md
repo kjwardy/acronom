@@ -119,4 +119,6 @@ yarn build
 | `POSTGRES_USER` | No | `postgres` | `acronom` | PostgreSQL user |
 | `POSTGRES_PASS` | No | `password` | | PostgreSQL password |
 
+See the [API documentation](./docs/api.md) for detailed endpoint usage and examples.
+
 More advanced deployment guides can be found on the [Advanced Deployment](./docs/deployments/advanced-deployment.md) page.

@@ -9,19 +9,18 @@ import (
 	"github.com/kjwardy/acronom/api/config"
 )
 
-type pool interface {
-	Ping(context.Context) error
-	Close()
-}
-
-type connector func(context.Context, *pgxpool.Config) (pool, error)
+type connector func(context.Context, *pgxpool.Config) (*pgxpool.Pool, error)
 
 type DB struct {
-	pool pool
+	pool *pgxpool.Pool
+}
+
+func (database *DB) Pool() *pgxpool.Pool {
+	return database.pool
 }
 
 func Connect(ctx context.Context, databaseConfig config.Database) (*DB, error) {
-	return connectWith(ctx, databaseConfig, func(ctx context.Context, config *pgxpool.Config) (pool, error) {
+	return connectWith(ctx, databaseConfig, func(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
 		return pgxpool.NewWithConfig(ctx, config)
 	})
 }
@@ -60,4 +59,33 @@ func (database *DB) Ping(ctx context.Context) error {
 
 func (database *DB) Close() {
 	database.pool.Close()
+}
+
+// CreateSchema creates the acronyms table and indexes if they don't exist
+// This is called during application startup to ensure the database schema is up to date
+func (database *DB) CreateSchema(ctx context.Context) error {
+	// Create the acronyms table with all required fields and constraints
+	_, err := database.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS acronyms (
+			id BIGSERIAL PRIMARY KEY,
+			acronym TEXT NOT NULL UNIQUE,
+			definition TEXT NOT NULL,
+			link TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create acronyms table: %w", err)
+	}
+
+	// Create an index on the lowercase version of acronym for case-insensitive lookups
+	_, err = database.pool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_acronyms_acronym ON acronyms(LOWER(acronym))
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create acronym index: %w", err)
+	}
+
+	return nil
 }

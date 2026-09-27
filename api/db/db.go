@@ -19,6 +19,10 @@ func (database *DB) Pool() *pgxpool.Pool {
 	return database.pool
 }
 
+func (database *DB) Ping(ctx context.Context) error {
+	return database.pool.Ping(ctx)
+}
+
 func Connect(ctx context.Context, databaseConfig config.Database) (*DB, error) {
 	return connectWith(ctx, databaseConfig, func(ctx context.Context, config *pgxpool.Config) (*pgxpool.Pool, error) {
 		return pgxpool.NewWithConfig(ctx, config)
@@ -51,10 +55,6 @@ func poolConfig(databaseConfig config.Database) (*pgxpool.Config, error) {
 		Path:   databaseConfig.Database,
 	}
 	return pgxpool.ParseConfig(connectionURL.String())
-}
-
-func (database *DB) Ping(ctx context.Context) error {
-	return database.pool.Ping(ctx)
 }
 
 func (database *DB) Close() {

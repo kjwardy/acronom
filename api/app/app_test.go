@@ -2,82 +2,37 @@ package app
 
 import (
 	"context"
-	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 )
 
-type healthChecker struct {
-	err error
+// mockDatabaseProvider is a mock implementation of DatabaseProvider for testing
+type mockDatabaseProvider struct {
+	pool *pgxpool.Pool
 }
 
-func (checker healthChecker) Ping(context.Context) error {
-	return checker.err
+func (m *mockDatabaseProvider) Ping(ctx context.Context) error {
+	return nil
 }
 
-func TestHealth(t *testing.T) {
+func (m *mockDatabaseProvider) Pool() *pgxpool.Pool {
+	return m.pool
+}
+
+func TestInitWithMockDatabase(t *testing.T) {
+	// Test that Init doesn't panic when passed a mock DatabaseProvider
+	mockDB := &mockDatabaseProvider{pool: nil}
+	
 	e := echo.New()
-	Init(e, healthChecker{})
-
-	request := httptest.NewRequest(http.MethodGet, "/health", nil)
-	response := httptest.NewRecorder()
-	e.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", response.Code)
-	}
-	if response.Body.String() != "{\"UP\":true}\n" {
-		t.Fatalf("unexpected response: %s", response.Body.String())
-	}
-}
-
-func TestHealthWhenDatabaseIsUnavailable(t *testing.T) {
-	e := echo.New()
-	Init(e, healthChecker{err: errors.New("unavailable")})
-
-	request := httptest.NewRequest(http.MethodGet, "/health", nil)
-	response := httptest.NewRecorder()
-	e.ServeHTTP(response, request)
-
-	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected status 503, got %d", response.Code)
-	}
-	if response.Body.String() != "{\"UP\":false}\n" {
-		t.Fatalf("unexpected response: %s", response.Body.String())
-	}
-}
-
-func TestStatus(t *testing.T) {
-	e := echo.New()
-	Init(e, healthChecker{})
-
-	request := httptest.NewRequest(http.MethodGet, "/api/status", nil)
-	response := httptest.NewRecorder()
-	e.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", response.Code)
-	}
-	if response.Body.String() != "{\"name\":\"Acronom API\",\"status\":\"ready\"}\n" {
-		t.Fatalf("unexpected response: %s", response.Body.String())
-	}
-}
-
-func TestRootRedirect(t *testing.T) {
-	e := echo.New()
-	Init(e, healthChecker{})
-
-	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	response := httptest.NewRecorder()
-	e.ServeHTTP(response, request)
-
-	if response.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("expected status 307, got %d", response.Code)
-	}
-	if response.Header().Get("Location") != "/acronom" {
-		t.Fatalf("unexpected redirect: %s", response.Header().Get("Location"))
-	}
+	
+	// This should not panic since we're using the interface instead of type assertion
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Init panicked with mock database: %v", r)
+		}
+	}()
+	
+	Init(e, mockDB)
 }

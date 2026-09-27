@@ -5,23 +5,30 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kjwardy/acronom/api/db"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kjwardy/acronom/api/handler"
 	"github.com/kjwardy/acronom/api/model"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
+// HealthChecker defines the interface for checking database connectivity
 type HealthChecker interface {
 	Ping(context.Context) error
 }
 
+// DatabaseProvider defines the interface for providing database access
+// This allows Init to work with both real DB instances and mock implementations
+type DatabaseProvider interface {
+	HealthChecker
+	Pool() *pgxpool.Pool
+}
+
 // Init initializes the Echo application with middleware, routes, and handlers
 // This follows the go-url pattern of centralized route registration
-func Init(e *echo.Echo, database HealthChecker) {
-	// Type assert to get the concrete DB instance and create the acronym store
-	dbInstance := database.(*db.DB)
-	acronymStore := model.NewPGAcronymStore(dbInstance.Pool())
+func Init(e *echo.Echo, database DatabaseProvider) {
+	// Get the database pool from the provider and create the acronym store
+	acronymStore := model.NewPGAcronymStore(database.Pool())
 
 	// Create the handler with the acronym store dependency
 	h := &handler.Handler{

@@ -3,7 +3,10 @@ package config
 import "testing"
 
 func TestLoadDefaults(t *testing.T) {
-	setEnvironment(t, map[string]string{})
+	setEnvironment(t, map[string]string{
+		"HOSTS":   "localhost",
+		"APP_URI": "http://localhost:1323",
+	})
 
 	config, err := Load()
 	if err != nil {
@@ -14,6 +17,12 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if config.Debug {
 		t.Fatal("expected debug to be disabled")
+	}
+	if config.Hosts != "localhost" {
+		t.Fatalf("expected hosts 'localhost', got '%s'", config.Hosts)
+	}
+	if config.AppURI != "http://localhost:1323" {
+		t.Fatalf("expected app URI 'http://localhost:1323', got '%s'", config.AppURI)
 	}
 	expected := Database{
 		Addr:     "localhost:5432",
@@ -30,6 +39,8 @@ func TestLoadFromEnvironment(t *testing.T) {
 	setEnvironment(t, map[string]string{
 		"PORT":              "8080",
 		"DEBUG":             "true",
+		"HOSTS":             "example.com",
+		"APP_URI":           "http://example.com",
 		"POSTGRES_ADDR":     "database:5433",
 		"POSTGRES_DATABASE": "acronom_test",
 		"POSTGRES_USER":     "acronom",
@@ -58,7 +69,11 @@ func TestLoadFromEnvironment(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidPort(t *testing.T) {
-	setEnvironment(t, map[string]string{"PORT": "invalid"})
+	setEnvironment(t, map[string]string{
+		"PORT":    "invalid",
+		"HOSTS":   "localhost",
+		"APP_URI": "http://localhost:1323",
+	})
 
 	if _, err := Load(); err == nil {
 		t.Fatal("expected an invalid port error")
@@ -66,10 +81,34 @@ func TestLoadRejectsInvalidPort(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidDatabaseAddress(t *testing.T) {
-	setEnvironment(t, map[string]string{"POSTGRES_ADDR": "database"})
+	setEnvironment(t, map[string]string{
+		"HOSTS":         "localhost",
+		"APP_URI":       "http://localhost:1323",
+		"POSTGRES_ADDR": "database",
+	})
 
 	if _, err := Load(); err == nil {
 		t.Fatal("expected an invalid database address error")
+	}
+}
+
+func TestLoadRejectsMissingHosts(t *testing.T) {
+	setEnvironment(t, map[string]string{
+		"APP_URI": "http://localhost:1323",
+	})
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error for missing HOSTS")
+	}
+}
+
+func TestLoadRejectsMissingAppURI(t *testing.T) {
+	setEnvironment(t, map[string]string{
+		"HOSTS": "localhost",
+	})
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected an error for missing APP_URI")
 	}
 }
 
@@ -90,6 +129,8 @@ func setEnvironment(t *testing.T, values map[string]string) {
 	for _, name := range []string{
 		"PORT",
 		"DEBUG",
+		"HOSTS",
+		"APP_URI",
 		"POSTGRES_ADDR",
 		"POSTGRES_DATABASE",
 		"POSTGRES_USER",

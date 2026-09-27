@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -8,9 +10,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type healthChecker struct {
+	err error
+}
+
+func (checker healthChecker) Ping(context.Context) error {
+	return checker.err
+}
+
 func TestHealth(t *testing.T) {
 	e := echo.New()
-	Init(e)
+	Init(e, healthChecker{})
 
 	request := httptest.NewRequest(http.MethodGet, "/health", nil)
 	response := httptest.NewRecorder()
@@ -24,9 +34,25 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestHealthWhenDatabaseIsUnavailable(t *testing.T) {
+	e := echo.New()
+	Init(e, healthChecker{err: errors.New("unavailable")})
+
+	request := httptest.NewRequest(http.MethodGet, "/health", nil)
+	response := httptest.NewRecorder()
+	e.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", response.Code)
+	}
+	if response.Body.String() != "{\"UP\":false}\n" {
+		t.Fatalf("unexpected response: %s", response.Body.String())
+	}
+}
+
 func TestStatus(t *testing.T) {
 	e := echo.New()
-	Init(e)
+	Init(e, healthChecker{})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 	response := httptest.NewRecorder()
@@ -42,7 +68,7 @@ func TestStatus(t *testing.T) {
 
 func TestRootRedirect(t *testing.T) {
 	e := echo.New()
-	Init(e)
+	Init(e, healthChecker{})
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
 	response := httptest.NewRecorder()

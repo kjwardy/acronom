@@ -51,7 +51,7 @@ After creating the container, it can be stopped and started again with `docker s
 ```sh
 cd api
 go mod download
-go run .
+POSTGRES_PASS=password HOSTS=localhost APP_URI=http://localhost:3000 go run .
 ```
 
 The API listens on `http://localhost:1323`. Check it with:

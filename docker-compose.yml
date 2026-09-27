@@ -1,0 +1,30 @@
+version: '3'
+
+services:
+  app:
+    container_name: acronom
+    build: .
+    ports:
+      - 8080:1323
+    depends_on:
+      - postgres
+    environment:
+      - POSTGRES_ADDR=postgres:5432
+      - POSTGRES_PASS=password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DATABASE=acronom
+      - HOSTS=acronom,localhost
+      - APP_URI=http://localhost:8080
+      - DEBUG=false
+    restart: on-failure
+  postgres:
+    container_name: postgres
+    image: postgres:17
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=acronom
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - 5432:5432

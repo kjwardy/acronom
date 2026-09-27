@@ -15,8 +15,10 @@ type Database struct {
 }
 
 type Config struct {
-	Debug    bool
-	Port     int
+	Debug  bool
+	Port   int
+	Hosts  string
+	AppURI string
 	Database Database
 }
 
@@ -29,6 +31,8 @@ func Load() (Config, error) {
 			User:     envOrDefault("POSTGRES_USER", "postgres"),
 			Pass:     envOrDefault("POSTGRES_PASS", "password"),
 		},
+		Hosts:  envOrDefault("HOSTS", ""),
+		AppURI: envOrDefault("APP_URI", ""),
 	}
 
 	if value := os.Getenv("PORT"); value != "" {
@@ -45,6 +49,14 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("DEBUG must be a boolean")
 		}
 		config.Debug = debug
+	}
+
+	if config.Hosts == "" {
+		return Config{}, fmt.Errorf("HOSTS is required")
+	}
+
+	if config.AppURI == "" {
+		return Config{}, fmt.Errorf("APP_URI is required")
 	}
 
 	if err := validateDatabase(config.Database); err != nil {

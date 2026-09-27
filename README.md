@@ -2,6 +2,8 @@
 
 Placeholder for CircleCI and GitHub actions badges
 
+[![GitHub Actions](https://github.com/kjwardy/acronom/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/kjwardy/acronom/actions/workflows/validate.yml?query=branch%3Amain)
+
 A simple collaborative acronym glossary in Go with a React frontend and Postgres database.
 
 # Features

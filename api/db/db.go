@@ -68,7 +68,7 @@ func (database *DB) CreateSchema(ctx context.Context) error {
 	_, err := database.pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS acronyms (
 			id BIGSERIAL PRIMARY KEY,
-			acronym TEXT NOT NULL UNIQUE,
+			acronym TEXT NOT NULL,
 			definition TEXT NOT NULL,
 			link TEXT,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -85,6 +85,22 @@ func (database *DB) CreateSchema(ctx context.Context) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create acronym index: %w", err)
+	}
+
+	_, err = database.pool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_acronyms_acronym_prefix
+		ON acronyms(LOWER(acronym) text_pattern_ops)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create acronym prefix index: %w", err)
+	}
+
+	_, err = database.pool.Exec(ctx, `
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_acronyms_unique_meaning
+		ON acronyms(LOWER(acronym), LOWER(definition))
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create acronym meaning constraint: %w", err)
 	}
 
 	return nil

@@ -15,10 +15,10 @@ type Database struct {
 }
 
 type Config struct {
-	Debug  bool
-	Port   int
-	Hosts  string
-	AppURI string
+	Debug    bool
+	Port     int
+	Hosts    string
+	AppURI   string
 	Database Database
 }
 

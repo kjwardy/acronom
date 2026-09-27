@@ -31,6 +31,11 @@ func main() {
 	}
 	defer database.Close()
 
+	// Create database schema (tables and indexes) on startup
+	if err := database.CreateSchema(context.Background()); err != nil {
+		log.Fatalf("database schema creation failed: %v", err)
+	}
+
 	e := echo.New()
 	e.Debug = appConfig.Debug
 	app.Init(e, database)

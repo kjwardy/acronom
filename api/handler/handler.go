@@ -3,10 +3,13 @@ package handler
 import (
 	"net/http"
 
+	"github.com/kjwardy/acronom/api/model"
 	"github.com/labstack/echo/v4"
 )
 
-type Handler struct{}
+type Handler struct {
+	Acronyms model.AcronymStore
+}
 
 type Status struct {
 	Name   string `json:"name"`

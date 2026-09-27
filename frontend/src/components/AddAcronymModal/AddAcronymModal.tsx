@@ -123,7 +123,9 @@ const AddAcronymModal: React.FC<AddAcronymModalProps> = ({
         <DialogTitle id="add-acronym-title">Add new acronym</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Add an acronym and its definition to the shared glossary.
+            Add an acronym and its definition to the shared glossary. Acronyms
+            can have multiple meanings, but each definition can only be added
+            once.
           </DialogContentText>
           <TextField
             autoComplete="off"

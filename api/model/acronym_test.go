@@ -2,9 +2,11 @@ package model
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kjwardy/acronom/api/config"
 	"github.com/kjwardy/acronom/api/db"
@@ -62,6 +64,19 @@ func setupTestDB(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+func TestIsAcronymMeaningConflict(t *testing.T) {
+	postgresError := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: "idx_acronyms_unique_meaning",
+	}
+	if !isAcronymMeaningConflict(postgresError) {
+		t.Fatal("Expected matching unique violation to be detected")
+	}
+	if isAcronymMeaningConflict(&pgconn.PgError{Code: "23505", ConstraintName: "other_index"}) {
+		t.Fatal("Expected unrelated unique violation to be ignored")
+	}
+}
+
 func TestPGAcronymStore_Create(t *testing.T) {
 	pool := setupTestDB(t)
 	defer pool.Close()
@@ -90,26 +105,32 @@ func TestPGAcronymStore_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("duplicate acronym", func(t *testing.T) {
-		acronym1 := &Acronym{
-			Acronym:    "REST",
-			Definition: "Representational State Transfer",
+	t.Run("multiple meanings for the same acronym", func(t *testing.T) {
+		first := &Acronym{
+			Acronym:    "PC",
+			Definition: "Personal Computer",
 		}
-		err := store.Create(ctx, acronym1)
-		if err != nil {
-			t.Fatalf("Failed to create first acronym: %v", err)
+		if err := store.Create(ctx, first); err != nil {
+			t.Fatalf("Failed to create first meaning: %v", err)
 		}
 
-		acronym2 := &Acronym{
-			Acronym:    "REST",
-			Definition: "Different definition",
+		second := &Acronym{
+			Acronym:    "PC",
+			Definition: "Probable Cause",
 		}
-		err = store.Create(ctx, acronym2)
-		if err == nil {
-			t.Error("Expected error when creating duplicate acronym")
+		if err := store.Create(ctx, second); err != nil {
+			t.Fatalf("Failed to create second meaning: %v", err)
 		}
-		if err != nil && err.Error() != "acronym already exists" {
-			t.Errorf("Expected 'acronym already exists' error, got: %v", err)
+		if first.ID == second.ID {
+			t.Fatal("Expected each meaning to have a distinct ID")
+		}
+
+		duplicate := &Acronym{
+			Acronym:    "pc",
+			Definition: "personal computer",
+		}
+		if err := store.Create(ctx, duplicate); !errors.Is(err, ErrAcronymMeaningExists) {
+			t.Fatalf("Expected duplicate meaning error, got: %v", err)
 		}
 	})
 }
@@ -262,6 +283,47 @@ func TestPGAcronymStore_Delete(t *testing.T) {
 			t.Errorf("Expected 'acronym not found' error, got: %v", err)
 		}
 	})
+}
+
+func TestPGAcronymStore_Search(t *testing.T) {
+	pool := setupTestDB(t)
+	defer pool.Close()
+	store := NewPGAcronymStore(pool)
+	ctx := context.Background()
+
+	entries := []*Acronym{
+		{Acronym: "ZAPI", Definition: "An acronym containing API"},
+		{Acronym: "SDK", Definition: "Tools for building an API client"},
+		{Acronym: "API Gateway", Definition: "A gateway for application interfaces"},
+		{Acronym: "API", Definition: "Application Programming Interface"},
+	}
+	for _, entry := range entries {
+		if err := store.Create(ctx, entry); err != nil {
+			t.Fatalf("Failed to create search fixture: %v", err)
+		}
+	}
+
+	results, err := store.Search(ctx, "  aPi  ")
+	if err != nil {
+		t.Fatalf("Search() failed: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("Expected 4 results, got %d", len(results))
+	}
+	expectedOrder := []string{"API", "API Gateway", "SDK", "ZAPI"}
+	for index, expected := range expectedOrder {
+		if results[index].Acronym != expected {
+			t.Fatalf("Expected result %d to be %q, got %q", index, expected, results[index].Acronym)
+		}
+	}
+
+	results, err = store.Search(ctx, "missing")
+	if err != nil {
+		t.Fatalf("Search() failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("Expected no results, got %d", len(results))
+	}
 }
 
 func TestPGAcronymStore_FindByAcronym(t *testing.T) {

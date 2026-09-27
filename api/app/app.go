@@ -53,7 +53,8 @@ func Init(e *echo.Echo, database DatabaseProvider) {
 
 	// API routes for acronym management
 	api := e.Group("/api")
-	api.POST("/acronyms", h.CreateAcronym)        // Create new acronym
+	api.GET("/search", h.SearchAcronyms)
+	api.POST("/acronyms", h.CreateAcronym)       // Create new acronym
 	api.PUT("/acronyms/:id", h.UpdateAcronym)    // Update existing acronym
 	api.DELETE("/acronyms/:id", h.DeleteAcronym) // Delete acronym
 

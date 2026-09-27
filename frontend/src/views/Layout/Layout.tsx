@@ -23,6 +23,15 @@ const useStyles = makeStyles((theme) => ({
     bottom: theme.spacing(3),
     boxShadow: '0 8px 24px rgba(20, 29, 60, 0.24)',
   },
+  successToast: {
+    width: 'auto',
+    minWidth: 'unset',
+    color: theme.palette.common.white,
+    backgroundColor: '#2e7d32',
+    '& .MuiSnackbarContent-message': {
+      textAlign: 'center',
+    },
+  },
 }));
 
 interface LayoutProps {
@@ -30,18 +39,14 @@ interface LayoutProps {
   onToggleMode: () => void;
 }
 
-interface AcronymEntry {
-  acronym: string;
-}
-
 const Layout: React.FC<LayoutProps> = ({ children, mode, onToggleMode }) => {
   const classes = useStyles();
   const [addOpen, setAddOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  const handleCreated = (entry: AcronymEntry) => {
+  const handleCreated = () => {
     setAddOpen(false);
-    setSuccessMessage(`${entry.acronym} was added successfully.`);
+    setSuccessMessage('Acronym added successfully!');
   };
 
   const closeSuccess = (_event?: React.SyntheticEvent, reason?: string) => {
@@ -71,6 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children, mode, onToggleMode }) => {
       <Snackbar
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         autoHideDuration={5000}
+        ContentProps={{ className: classes.successToast }}
         message={successMessage}
         onClose={closeSuccess}
         open={Boolean(successMessage)}

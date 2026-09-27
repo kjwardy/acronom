@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,14 +12,14 @@ import (
 
 // CreateAcronymRequest represents the JSON request body for creating an acronym
 type CreateAcronymRequest struct {
-	Acronym    string  `json:"acronym"`    // The acronym text (required)
-	Definition string  `json:"definition"` // The definition of the acronym (required)
+	Acronym    string  `json:"acronym"`        // The acronym text (required)
+	Definition string  `json:"definition"`     // The definition of the acronym (required)
 	Link       *string `json:"link,omitempty"` // Optional link to external resource
 }
 
 // UpdateAcronymRequest represents the JSON request body for updating an acronym
 type UpdateAcronymRequest struct {
-	Definition string  `json:"definition"` // The updated definition (required)
+	Definition string  `json:"definition"`     // The updated definition (required)
 	Link       *string `json:"link,omitempty"` // Optional updated link
 }
 
@@ -38,8 +39,8 @@ func (h *Handler) CreateAcronym(c echo.Context) error {
 
 	// Attempt to create the acronym in the database
 	if err := h.Acronyms.Create(c.Request().Context(), acronym); err != nil {
-		if err.Error() == "acronym already exists" {
-			return echo.NewHTTPError(http.StatusConflict, "An acronym with this name already exists")
+		if errors.Is(err, model.ErrAcronymMeaningExists) {
+			return echo.NewHTTPError(http.StatusConflict, "This acronym and definition already exist")
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create acronym")
 	}
@@ -68,6 +69,9 @@ func (h *Handler) UpdateAcronym(c echo.Context) error {
 
 	// Attempt to update the acronym in the database
 	if err := h.Acronyms.Update(c.Request().Context(), acronym); err != nil {
+		if errors.Is(err, model.ErrAcronymMeaningExists) {
+			return echo.NewHTTPError(http.StatusConflict, "This acronym and definition already exist")
+		}
 		if err.Error() == "acronym not found" {
 			return echo.NewHTTPError(http.StatusNotFound, "Acronym not found")
 		}

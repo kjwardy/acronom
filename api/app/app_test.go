@@ -24,15 +24,15 @@ func (m *mockDatabaseProvider) Pool() *pgxpool.Pool {
 func TestInitWithMockDatabase(t *testing.T) {
 	// Test that Init doesn't panic when passed a mock DatabaseProvider
 	mockDB := &mockDatabaseProvider{pool: nil}
-	
+
 	e := echo.New()
-	
+
 	// This should not panic since we're using the interface instead of type assertion
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("Init panicked with mock database: %v", r)
 		}
 	}()
-	
+
 	Init(e, mockDB)
 }

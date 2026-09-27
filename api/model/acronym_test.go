@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,7 +12,31 @@ import (
 // This ensures each test starts with a clean slate
 func setupTestDB(t *testing.T) *pgxpool.Pool {
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, "postgres://postgres:password@localhost:5432/acronom")
+	
+	// Use environment variables for database connection if available
+	postgresAddr := os.Getenv("POSTGRES_ADDR")
+	if postgresAddr == "" {
+		postgresAddr = "localhost:5432"
+	}
+	
+	postgresUser := os.Getenv("POSTGRES_USER")
+	if postgresUser == "" {
+		postgresUser = "postgres"
+	}
+	
+	postgresPass := os.Getenv("POSTGRES_PASS")
+	if postgresPass == "" {
+		postgresPass = "password"
+	}
+	
+	postgresDB := os.Getenv("POSTGRES_DATABASE")
+	if postgresDB == "" {
+		postgresDB = "acronom"
+	}
+	
+	connStr := "postgres://" + postgresUser + ":" + postgresPass + "@" + postgresAddr + "/" + postgresDB
+	
+	pool, err := pgxpool.New(ctx, connStr)
 	if err != nil {
 		t.Fatalf("Failed to create test database pool: %v", err)
 	}

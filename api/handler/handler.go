@@ -9,6 +9,7 @@ import (
 
 type Handler struct {
 	Acronyms model.AcronymStore
+	Metrics  model.MetricsStore
 }
 
 type Status struct {

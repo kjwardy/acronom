@@ -11,6 +11,7 @@ import EditIcon from '@material-ui/icons/Edit';
 import SearchIcon from '@material-ui/icons/Search';
 import { makeStyles } from '@material-ui/core/styles';
 import EditAcronymModal from '../../components/EditAcronymModal';
+import { formatAcronymCount, useMetrics } from '../../contexts/Metrics';
 
 export interface AcronymResult {
   id: number;
@@ -188,6 +189,13 @@ const Home: React.FC = () => {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasSearched, setHasSearched] = useState(false);
+  const {
+    decrementTotal,
+    failed,
+    loading: metricsLoading,
+    totalAcronyms,
+  } = useMetrics();
   const classes = useStyles();
 
   const handleSubmit = async (event: FormEvent) => {
@@ -199,6 +207,7 @@ const Home: React.FC = () => {
       return;
     }
 
+    setHasSearched(true);
     setLoading(true);
     setError('');
     setResults(null);
@@ -224,6 +233,7 @@ const Home: React.FC = () => {
     setResults((current) =>
       current ? removeAcronymResult(current, deletedID) : null,
     );
+    decrementTotal();
     setSuccessType('deleted');
     setSuccessMessage('Acronym deleted successfully!');
     setEditing(null);
@@ -233,12 +243,18 @@ const Home: React.FC = () => {
     if (reason !== 'clickaway') setSuccessMessage('');
   };
 
-  const hasSearchState = loading || Boolean(error) || results !== null;
+  let metricText = 'Loading acronym count…';
+  if (!metricsLoading) {
+    metricText =
+      failed || totalAcronyms === null
+        ? 'Acronym count unavailable'
+        : formatAcronymCount(totalAcronyms);
+  }
 
   return (
     <div
       className={`${classes.root} ${
-        hasSearchState ? classes.rootWithResults : ''
+        hasSearched ? classes.rootWithResults : ''
       }`}
     >
       {editing && (
@@ -250,14 +266,18 @@ const Home: React.FC = () => {
         />
       )}
       <div className={classes.content}>
-        <img
-          alt="Acronom logo"
-          className={classes.logo}
-          src={`${process.env.PUBLIC_URL}/logo.png`}
-        />
-        <Typography className={classes.title} variant="h4">
-          Acronom
-        </Typography>
+        {!hasSearched && (
+          <>
+            <img
+              alt="Acronom logo"
+              className={classes.logo}
+              src={`${process.env.PUBLIC_URL}/logo.png`}
+            />
+            <Typography className={classes.title} variant="h4">
+              Acronom
+            </Typography>
+          </>
+        )}
         <Paper
           className={classes.search}
           component="form"
@@ -283,9 +303,11 @@ const Home: React.FC = () => {
             <SearchIcon />
           </IconButton>
         </Paper>
-        <Paper className={classes.info} elevation={0}>
-          <Typography variant="body2">X number of acronyms stored!</Typography>
-        </Paper>
+        {!hasSearched && (
+          <Paper className={classes.info} elevation={0}>
+            <Typography variant="body2">{metricText}</Typography>
+          </Paper>
+        )}
         {loading && (
           <div className={classes.message} role="status">
             <CircularProgress size={28} />

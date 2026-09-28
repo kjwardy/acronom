@@ -6,6 +6,7 @@ import AddIcon from '@material-ui/icons/Add';
 import { makeStyles } from '@material-ui/core/styles';
 import AddAcronymModal from '../../components/AddAcronymModal';
 import Header from '../../components/Header';
+import { useMetrics } from '../../contexts/Metrics';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -41,11 +42,13 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, mode, onToggleMode }) => {
   const classes = useStyles();
+  const { incrementTotal } = useMetrics();
   const [addOpen, setAddOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
   const handleCreated = () => {
     setAddOpen(false);
+    incrementTotal();
     setSuccessMessage('Acronym added successfully!');
   };
 

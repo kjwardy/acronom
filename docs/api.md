@@ -1,5 +1,23 @@
 # API Endpoints
 
+## Total Acronyms Metric
+
+Return the total number of glossary entries stored. Each meaning is counted as an individual entry, even when several entries share the same acronym.
+
+**Endpoint:** `GET /api/metrics/total-acronyms`
+
+**Response (200 OK):**
+```json
+{
+  "total_acronyms": 42
+}
+```
+
+An empty database returns `200 OK` with `total_acronyms` set to `0`.
+
+**Error Responses:**
+- `500 Internal Server Error`: Database error
+
 ## Search Acronyms
 
 Search acronym names and definitions. Matching is case-insensitive, with exact acronym matches followed by acronym prefixes and then other matches. Responses are limited to 50 entries.

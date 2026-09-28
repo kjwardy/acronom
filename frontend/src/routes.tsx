@@ -5,6 +5,7 @@ import {
   Route,
   Switch,
 } from 'react-router-dom';
+import { MetricsProvider } from './contexts/Metrics';
 import Home from './views/Home';
 import Layout from './views/Layout';
 
@@ -15,12 +16,14 @@ interface RoutesProps {
 
 const Routes: React.FC<RoutesProps> = ({ mode, onToggleMode }) => (
   <Router basename="/acronom">
-    <Layout mode={mode} onToggleMode={onToggleMode}>
-      <Switch>
-        <Route exact path="/" component={Home} />
-        <Redirect to="/" />
-      </Switch>
-    </Layout>
+    <MetricsProvider>
+      <Layout mode={mode} onToggleMode={onToggleMode}>
+        <Switch>
+          <Route exact path="/" component={Home} />
+          <Redirect to="/" />
+        </Switch>
+      </Layout>
+    </MetricsProvider>
   </Router>
 );
 

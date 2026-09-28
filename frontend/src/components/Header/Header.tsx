@@ -21,6 +21,14 @@ const useStyles = makeStyles((theme) => ({
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
     },
   },
+  logo: {
+    width: 34,
+    height: 34,
+    marginRight: theme.spacing(1),
+    objectFit: 'cover',
+    filter: 'invert(1)',
+    mixBlendMode: 'screen',
+  },
   brand: {
     fontWeight: 600,
   },
@@ -40,7 +48,17 @@ const Header: React.FC<HeaderProps> = ({ mode, onToggleMode }) => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <a className={classes.link} href="/acronom">
+        <a
+          aria-label="Return to Acronom home"
+          className={classes.link}
+          href="/acronom"
+        >
+          <img
+            alt=""
+            aria-hidden="true"
+            className={classes.logo}
+            src={`${process.env.PUBLIC_URL}/logo.png`}
+          />
           <Typography className={classes.brand} color="inherit" variant="h6">
             Acronom
           </Typography>

@@ -1,5 +1,6 @@
-import React, { FormEvent, useState } from 'react';
+import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
+import Chip from '@material-ui/core/Chip';
 import CircularProgress from '@material-ui/core/CircularProgress';
 import IconButton from '@material-ui/core/IconButton';
 import InputBase from '@material-ui/core/InputBase';
@@ -11,16 +12,11 @@ import EditIcon from '@material-ui/icons/Edit';
 import SearchIcon from '@material-ui/icons/Search';
 import { makeStyles } from '@material-ui/core/styles';
 import EditAcronymModal from '../../components/EditAcronymModal';
+import { AcronymEntry, useAcronymEvents } from '../../contexts/AcronymEvents';
+import { getCategoryTextColour } from '../../contexts/Categories';
 import { formatAcronymCount, useMetrics } from '../../contexts/Metrics';
 
-export interface AcronymResult {
-  id: number;
-  acronym: string;
-  definition: string;
-  link?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+export type AcronymResult = AcronymEntry;
 
 export const searchAcronyms = async (
   query: string,
@@ -52,6 +48,38 @@ export const removeAcronymResult = (
   results: AcronymResult[],
   deletedID: number,
 ): AcronymResult[] => results.filter((result) => result.id !== deletedID);
+
+const searchRank = (entry: AcronymResult, query: string): number => {
+  const acronym = entry.acronym.toLocaleLowerCase();
+  if (acronym === query) return 0;
+  if (acronym.startsWith(query)) return 1;
+  return 2;
+};
+
+export const mergeCreatedAcronymResult = (
+  results: AcronymResult[],
+  created: AcronymResult,
+  query: string,
+): AcronymResult[] => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matches =
+    created.acronym.toLocaleLowerCase().includes(normalizedQuery) ||
+    created.definition.toLocaleLowerCase().includes(normalizedQuery);
+  if (!normalizedQuery || !matches) return results;
+
+  return [
+    ...results.filter((result) => result.id !== created.id),
+    created,
+  ].sort(
+    (first, second) =>
+      searchRank(first, normalizedQuery) -
+        searchRank(second, normalizedQuery) ||
+      first.acronym.localeCompare(second.acronym, undefined, {
+        sensitivity: 'base',
+      }) ||
+      first.id - second.id,
+  );
+};
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -152,6 +180,16 @@ const useStyles = makeStyles((theme) => ({
   resultDefinition: {
     color: theme.palette.text.secondary,
   },
+  categoryLabels: {
+    display: 'inline-flex',
+    flexWrap: 'wrap',
+    gap: theme.spacing(0.5),
+    marginLeft: theme.spacing(1),
+    verticalAlign: 'middle',
+  },
+  categoryLabel: {
+    fontWeight: 600,
+  },
   resultLink: {
     color: theme.palette.primary.main,
     textDecoration: 'none',
@@ -190,6 +228,9 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState('');
+  const { created } = useAcronymEvents();
+  const mergedCreation = useRef(0);
   const {
     decrementTotal,
     failed,
@@ -197,6 +238,20 @@ const Home: React.FC = () => {
     totalAcronyms,
   } = useMetrics();
   const classes = useStyles();
+
+  useEffect(() => {
+    if (
+      !created ||
+      !searchedQuery ||
+      !results ||
+      mergedCreation.current === created.sequence
+    )
+      return;
+    mergedCreation.current = created.sequence;
+    setResults(
+      mergeCreatedAcronymResult(results, created.entry, searchedQuery),
+    );
+  }, [created, results, searchedQuery]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -208,6 +263,7 @@ const Home: React.FC = () => {
     }
 
     setHasSearched(true);
+    setSearchedQuery(trimmedQuery);
     setLoading(true);
     setError('');
     setResults(null);
@@ -350,6 +406,23 @@ const Home: React.FC = () => {
                     {' - '}
                     {result.definition}
                   </span>
+                  {result.categories && result.categories.length > 0 && (
+                    <span className={classes.categoryLabels}>
+                      {result.categories.map((category) => (
+                        <Chip
+                          className={classes.categoryLabel}
+                          component="span"
+                          key={category.id}
+                          label={category.name}
+                          size="small"
+                          style={{
+                            backgroundColor: category.colour,
+                            color: getCategoryTextColour(category.colour),
+                          }}
+                        />
+                      ))}
+                    </span>
+                  )}
                 </Typography>
                 <Tooltip title={`Edit ${result.acronym}`}>
                   <IconButton

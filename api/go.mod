@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/labstack/echo/v4 v4.13.4
+	golang.org/x/text v0.29.0
 )
 
 require (
@@ -21,6 +22,5 @@ require (
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 )

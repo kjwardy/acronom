@@ -50,11 +50,12 @@ describe('updateAcronym', () => {
     mockedPut.mockResolvedValue({ data: updated });
 
     await expect(
-      updateAcronym(entry, ' Probable Cause ', ' https://example.com '),
+      updateAcronym(entry, ' Probable Cause ', ' https://example.com ', [1, 3]),
     ).resolves.toEqual(updated);
     expect(mockedPut).toHaveBeenCalledWith('/api/acronyms/7', {
       definition: 'Probable Cause',
       link: 'https://example.com',
+      category_ids: [1, 3],
     });
   });
 
@@ -62,10 +63,11 @@ describe('updateAcronym', () => {
     const entry = { id: 7, acronym: 'PC', definition: 'Personal Computer' };
     mockedPut.mockResolvedValue({ data: entry });
 
-    await updateAcronym(entry, 'Personal Computer', ' ');
+    await updateAcronym(entry, 'Personal Computer', ' ', []);
     expect(mockedPut).toHaveBeenCalledWith('/api/acronyms/7', {
       definition: 'Personal Computer',
       link: null,
+      category_ids: [],
     });
   });
 
@@ -78,6 +80,7 @@ describe('updateAcronym', () => {
         { id: 7, acronym: 'PC', definition: 'Personal Computer' },
         'Probable Cause',
         '',
+        [],
       ),
     ).rejects.toBe(error);
   });

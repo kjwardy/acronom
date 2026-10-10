@@ -8,8 +8,9 @@ import (
 )
 
 type Handler struct {
-	Acronyms model.AcronymStore
-	Metrics  model.MetricsStore
+	Acronyms   model.AcronymStore
+	Categories model.CategoryStore
+	Metrics    model.MetricsStore
 }
 
 type Status struct {

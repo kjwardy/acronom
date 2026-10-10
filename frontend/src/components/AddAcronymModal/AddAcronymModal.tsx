@@ -10,12 +10,15 @@ import DialogTitle from '@material-ui/core/DialogTitle';
 import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
+import CategorySelector from '../CategorySelector';
+import { Category } from '../../contexts/Categories';
 
 interface AcronymEntry {
   id: number;
   acronym: string;
   definition: string;
   link?: string;
+  categories: Category[];
 }
 
 interface AddAcronymModalProps {
@@ -67,11 +70,13 @@ export const createAcronym = async (
   acronym: string,
   definition: string,
   link: string,
+  categoryIDs: number[],
 ): Promise<AcronymEntry> => {
   const payload = {
     acronym: acronym.trim(),
     definition: definition.trim(),
     ...(link.trim() ? { link: link.trim() } : {}),
+    category_ids: categoryIDs,
   };
   const { data } = await axios.post<AcronymEntry>('/api/acronyms', payload);
   return data;
@@ -85,6 +90,7 @@ const AddAcronymModal: React.FC<AddAcronymModalProps> = ({
   const [acronym, setAcronym] = useState('');
   const [definition, setDefinition] = useState('');
   const [link, setLink] = useState('');
+  const [categoryIDs, setCategoryIDs] = useState<number[]>([]);
   const [errors, setErrors] = useState<FormErrors>({});
   const [requestError, setRequestError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +104,7 @@ const AddAcronymModal: React.FC<AddAcronymModalProps> = ({
 
     setSubmitting(true);
     try {
-      const entry = await createAcronym(acronym, definition, link);
+      const entry = await createAcronym(acronym, definition, link, categoryIDs);
       onCreated(entry);
     } catch (error) {
       const response = (error as any).response?.data;
@@ -170,6 +176,11 @@ const AddAcronymModal: React.FC<AddAcronymModalProps> = ({
             placeholder="https://example.com"
             value={link}
             variant="outlined"
+          />
+          <CategorySelector
+            disabled={submitting}
+            onChange={setCategoryIDs}
+            selected={categoryIDs}
           />
           {requestError && (
             <Typography className={classes.error} role="alert" variant="body2">

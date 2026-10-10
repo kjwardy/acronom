@@ -12,15 +12,17 @@ import (
 
 // CreateAcronymRequest represents the JSON request body for creating an acronym
 type CreateAcronymRequest struct {
-	Acronym    string  `json:"acronym"`        // The acronym text (required)
-	Definition string  `json:"definition"`     // The definition of the acronym (required)
-	Link       *string `json:"link,omitempty"` // Optional link to external resource
+	Acronym     string  `json:"acronym"`        // The acronym text (required)
+	Definition  string  `json:"definition"`     // The definition of the acronym (required)
+	Link        *string `json:"link,omitempty"` // Optional link to external resource
+	CategoryIDs []int64 `json:"category_ids,omitempty"`
 }
 
 // UpdateAcronymRequest represents the JSON request body for updating an acronym
 type UpdateAcronymRequest struct {
-	Definition string  `json:"definition"`     // The updated definition (required)
-	Link       *string `json:"link,omitempty"` // Optional updated link
+	Definition  string   `json:"definition"`     // The updated definition (required)
+	Link        *string  `json:"link,omitempty"` // Optional updated link
+	CategoryIDs *[]int64 `json:"category_ids,omitempty"`
 }
 
 // CreateAcronym handles POST /api/acronyms requests
@@ -41,6 +43,9 @@ func (h *Handler) CreateAcronym(c echo.Context) error {
 	if err := h.Acronyms.Create(c.Request().Context(), acronym); err != nil {
 		if errors.Is(err, model.ErrAcronymMeaningExists) {
 			return echo.NewHTTPError(http.StatusConflict, "This acronym and definition already exist")
+		}
+		if errors.Is(err, model.ErrCategoryNotFound) {
+			return echo.NewHTTPError(http.StatusBadRequest, "One or more categories do not exist")
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create acronym")
 	}
@@ -71,6 +76,9 @@ func (h *Handler) UpdateAcronym(c echo.Context) error {
 	if err := h.Acronyms.Update(c.Request().Context(), acronym); err != nil {
 		if errors.Is(err, model.ErrAcronymMeaningExists) {
 			return echo.NewHTTPError(http.StatusConflict, "This acronym and definition already exist")
+		}
+		if errors.Is(err, model.ErrCategoryNotFound) {
+			return echo.NewHTTPError(http.StatusBadRequest, "One or more categories do not exist")
 		}
 		if err.Error() == "acronym not found" {
 			return echo.NewHTTPError(http.StatusNotFound, "Acronym not found")
@@ -119,11 +127,17 @@ func (h *Handler) validateCreateRequest(req CreateAcronymRequest) (*model.Acrony
 	if definition == "" {
 		return nil, echo.NewHTTPError(http.StatusBadRequest, "Definition is required")
 	}
+	categoryIDs, err := normalizeCategoryIDs(req.CategoryIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	return &model.Acronym{
-		Acronym:    acronym,
-		Definition: definition,
-		Link:       req.Link,
+		Acronym:     acronym,
+		Definition:  definition,
+		Link:        req.Link,
+		CategoryIDs: categoryIDs,
+		Categories:  make([]model.Category, 0),
 	}, nil
 }
 
@@ -152,8 +166,35 @@ func (h *Handler) validateUpdateRequest(ctx echo.Context, id string, req UpdateA
 	// Update the fields that can be modified
 	existing.Definition = definition
 	existing.Link = req.Link
+	if req.CategoryIDs != nil {
+		categoryIDs, err := normalizeCategoryIDs(*req.CategoryIDs)
+		if err != nil {
+			return nil, err
+		}
+		existing.CategoryIDs = categoryIDs
+		existing.CategoriesSpecified = true
+	}
 
 	return existing, nil
+}
+
+func normalizeCategoryIDs(ids []int64) ([]int64, error) {
+	seen := make(map[int64]struct{}, len(ids))
+	normalized := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id < 1 {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, "Category IDs must be positive")
+		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
+		normalized = append(normalized, id)
+	}
+	if len(normalized) > model.MaxCategoriesPerAcronym {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "A maximum of five categories is allowed")
+	}
+	return normalized, nil
 }
 
 // parseID converts a string ID to int64

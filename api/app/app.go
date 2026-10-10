@@ -29,12 +29,14 @@ type DatabaseProvider interface {
 func Init(e *echo.Echo, database DatabaseProvider) {
 	// Get the database pool from the provider and create the acronym store
 	acronymStore := model.NewPGAcronymStore(database.Pool())
+	categoryStore := model.NewPGCategoryStore(database.Pool())
 	metricsStore := model.NewPGMetricsStore(database.Pool())
 
 	// Create the handler with the acronym store dependency
 	h := &handler.Handler{
-		Acronyms: acronymStore,
-		Metrics:  metricsStore,
+		Acronyms:   acronymStore,
+		Categories: categoryStore,
+		Metrics:    metricsStore,
 	}
 
 	// Apply global middleware
@@ -55,6 +57,8 @@ func Init(e *echo.Echo, database DatabaseProvider) {
 
 	// API routes for acronym management
 	api := e.Group("/api")
+	api.GET("/categories", h.ListCategories)
+	api.POST("/categories", h.CreateCategory)
 	api.GET("/metrics/total-acronyms", h.TotalAcronyms)
 	api.GET("/search", h.SearchAcronyms)
 	api.POST("/acronyms", h.CreateAcronym)       // Create new acronym

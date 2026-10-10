@@ -46,12 +46,14 @@ describe('createAcronym', () => {
         ' API ',
         ' Application Programming Interface ',
         ' https://example.com ',
+        [1, 3],
       ),
     ).resolves.toEqual(entry);
     expect(mockedPost).toHaveBeenCalledWith('/api/acronyms', {
       acronym: 'API',
       definition: 'Application Programming Interface',
       link: 'https://example.com',
+      category_ids: [1, 3],
     });
   });
 
@@ -60,10 +62,11 @@ describe('createAcronym', () => {
       data: { id: 1, acronym: 'API', definition: 'Definition' },
     });
 
-    await createAcronym('API', 'Definition', ' ');
+    await createAcronym('API', 'Definition', ' ', []);
     expect(mockedPost).toHaveBeenCalledWith('/api/acronyms', {
       acronym: 'API',
       definition: 'Definition',
+      category_ids: [],
     });
   });
 
@@ -71,6 +74,8 @@ describe('createAcronym', () => {
     const error = new Error('request failed');
     mockedPost.mockRejectedValue(error);
 
-    await expect(createAcronym('API', 'Definition', '')).rejects.toBe(error);
+    await expect(createAcronym('API', 'Definition', '', [])).rejects.toBe(
+      error,
+    );
   });
 });

@@ -10,6 +10,8 @@ import DialogTitle from '@material-ui/core/DialogTitle';
 import TextField from '@material-ui/core/TextField';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
+import CategorySelector from '../CategorySelector';
+import { Category } from '../../contexts/Categories';
 
 export interface EditableAcronym {
   id: number;
@@ -18,6 +20,7 @@ export interface EditableAcronym {
   link?: string;
   created_at?: string;
   updated_at?: string;
+  categories?: Category[];
 }
 
 interface EditAcronymModalProps {
@@ -75,10 +78,12 @@ export const updateAcronym = async (
   entry: EditableAcronym,
   definition: string,
   link: string,
+  categoryIDs: number[],
 ): Promise<EditableAcronym> => {
   const payload = {
     definition: definition.trim(),
     link: link.trim() || null,
+    category_ids: categoryIDs,
   };
   const { data } = await axios.put<EditableAcronym>(
     `/api/acronyms/${entry.id}`,
@@ -100,6 +105,9 @@ const EditAcronymModal: React.FC<EditAcronymModalProps> = ({
   const classes = useStyles();
   const [definition, setDefinition] = useState(entry.definition);
   const [link, setLink] = useState(entry.link || '');
+  const [categoryIDs, setCategoryIDs] = useState<number[]>(
+    (entry.categories || []).map((category) => category.id),
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   const [requestError, setRequestError] = useState('');
   const [deleteError, setDeleteError] = useState('');
@@ -116,7 +124,7 @@ const EditAcronymModal: React.FC<EditAcronymModalProps> = ({
 
     setSubmitting(true);
     try {
-      onUpdated(await updateAcronym(entry, definition, link));
+      onUpdated(await updateAcronym(entry, definition, link, categoryIDs));
     } catch (error) {
       const response = (error as any).response?.data;
       setRequestError(
@@ -203,6 +211,11 @@ const EditAcronymModal: React.FC<EditAcronymModalProps> = ({
               placeholder="https://example.com"
               value={link}
               variant="outlined"
+            />
+            <CategorySelector
+              disabled={submitting || deleting}
+              onChange={setCategoryIDs}
+              selected={categoryIDs}
             />
             {requestError && (
               <Typography

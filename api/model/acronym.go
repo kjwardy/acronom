@@ -14,12 +14,15 @@ import (
 
 // Acronym represents an acronym entry in the database
 type Acronym struct {
-	ID         int64     `json:"id"`             // Unique identifier
-	Acronym    string    `json:"acronym"`        // The acronym text (e.g., "API")
-	Definition string    `json:"definition"`     // The definition of the acronym
-	Link       *string   `json:"link,omitempty"` // Optional link to external resource
-	CreatedAt  time.Time `json:"created_at"`     // Timestamp when the acronym was created
-	UpdatedAt  time.Time `json:"updated_at"`     // Timestamp when the acronym was last updated
+	ID                  int64      `json:"id"`             // Unique identifier
+	Acronym             string     `json:"acronym"`        // The acronym text (e.g., "API")
+	Definition          string     `json:"definition"`     // The definition of the acronym
+	Link                *string    `json:"link,omitempty"` // Optional link to external resource
+	CreatedAt           time.Time  `json:"created_at"`     // Timestamp when the acronym was created
+	UpdatedAt           time.Time  `json:"updated_at"`     // Timestamp when the acronym was last updated
+	Categories          []Category `json:"categories"`
+	CategoryIDs         []int64    `json:"-"`
+	CategoriesSpecified bool       `json:"-"`
 }
 
 // AcronymStore defines the interface for acronym persistence operations
@@ -46,12 +49,93 @@ func NewPGAcronymStore(pool *pgxpool.Pool) *PGAcronymStore {
 const SearchResultLimit = 50
 
 var ErrAcronymMeaningExists = errors.New("acronym meaning already exists")
+var ErrTooManyCategories = errors.New("too many categories")
 
 func isAcronymMeaningConflict(err error) bool {
 	var postgresError *pgconn.PgError
 	return errors.As(err, &postgresError) &&
 		postgresError.Code == "23505" &&
 		postgresError.ConstraintName == "idx_acronyms_unique_meaning"
+}
+
+type categoryQuerier interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func loadAcronymCategories(ctx context.Context, query categoryQuerier, acronyms []*Acronym) error {
+	ids := make([]int64, 0, len(acronyms))
+	byID := make(map[int64]*Acronym, len(acronyms))
+	for _, acronym := range acronyms {
+		acronym.Categories = make([]Category, 0)
+		ids = append(ids, acronym.ID)
+		byID[acronym.ID] = acronym
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	rows, err := query.Query(ctx, `
+		SELECT ac.acronym_id, c.id, c.name, c.colour, c.created_at, c.updated_at
+		FROM acronym_categories ac
+		JOIN categories c ON c.id = ac.category_id
+		WHERE ac.acronym_id = ANY($1)
+		ORDER BY LOWER(c.name), c.id
+	`, ids)
+	if err != nil {
+		return fmt.Errorf("failed to load acronym categories: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var acronymID int64
+		var category Category
+		if err := rows.Scan(
+			&acronymID,
+			&category.ID,
+			&category.Name,
+			&category.Colour,
+			&category.CreatedAt,
+			&category.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("failed to read acronym category: %w", err)
+		}
+		if acronym := byID[acronymID]; acronym != nil {
+			acronym.Categories = append(acronym.Categories, category)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("failed to read acronym categories: %w", err)
+	}
+	return nil
+}
+
+func assignAcronymCategories(ctx context.Context, tx pgx.Tx, acronymID int64, categoryIDs []int64, replace bool) error {
+	if len(categoryIDs) > MaxCategoriesPerAcronym {
+		return ErrTooManyCategories
+	}
+	if len(categoryIDs) > 0 {
+		var count int
+		if err := tx.QueryRow(ctx, "SELECT COUNT(*) FROM categories WHERE id = ANY($1)", categoryIDs).Scan(&count); err != nil {
+			return fmt.Errorf("failed to validate categories: %w", err)
+		}
+		if count != len(categoryIDs) {
+			return ErrCategoryNotFound
+		}
+	}
+	if replace {
+		if _, err := tx.Exec(ctx, "DELETE FROM acronym_categories WHERE acronym_id = $1", acronymID); err != nil {
+			return fmt.Errorf("failed to replace acronym categories: %w", err)
+		}
+	}
+	for _, categoryID := range categoryIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO acronym_categories (acronym_id, category_id)
+			VALUES ($1, $2)
+		`, acronymID, categoryID); err != nil {
+			return fmt.Errorf("failed to assign acronym category: %w", err)
+		}
+	}
+	return nil
 }
 
 // Find retrieves an acronym by its ID
@@ -68,6 +152,9 @@ func (s *PGAcronymStore) Find(ctx context.Context, id int64) (*Acronym, error) {
 			return nil, nil // Not found is not an error
 		}
 		return nil, fmt.Errorf("failed to find acronym: %w", err)
+	}
+	if err := loadAcronymCategories(ctx, s.pool, []*Acronym{acronym}); err != nil {
+		return nil, err
 	}
 	return acronym, nil
 }
@@ -86,6 +173,9 @@ func (s *PGAcronymStore) FindByAcronym(ctx context.Context, acronym string) (*Ac
 			return nil, nil // Not found is not an error
 		}
 		return nil, fmt.Errorf("failed to find acronym by name: %w", err)
+	}
+	if err := loadAcronymCategories(ctx, s.pool, []*Acronym{acronymModel}); err != nil {
+		return nil, err
 	}
 	return acronymModel, nil
 }
@@ -135,30 +225,50 @@ func (s *PGAcronymStore) Search(ctx context.Context, query string) ([]Acronym, e
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("failed to read acronym search results: %w", err)
 	}
+	acronyms := make([]*Acronym, len(results))
+	for index := range results {
+		acronyms[index] = &results[index]
+	}
+	if err := loadAcronymCategories(ctx, s.pool, acronyms); err != nil {
+		return nil, err
+	}
 	return results, nil
 }
 
 // Create inserts a new acronym into the database
 func (s *PGAcronymStore) Create(ctx context.Context, acronym *Acronym) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin acronym creation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	now := time.Now()
 	acronym.CreatedAt = now
 	acronym.UpdatedAt = now
-
-	err := s.pool.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO acronyms (acronym, definition, link, created_at, updated_at)
 		 VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id`,
-		strings.TrimSpace(acronym.Acronym),    // Trim whitespace from acronym
-		strings.TrimSpace(acronym.Definition), // Trim whitespace from definition
+		strings.TrimSpace(acronym.Acronym),
+		strings.TrimSpace(acronym.Definition),
 		acronym.Link,
 		now,
 		now).Scan(&acronym.ID)
-
 	if err != nil {
 		if isAcronymMeaningConflict(err) {
 			return ErrAcronymMeaningExists
 		}
 		return fmt.Errorf("failed to create acronym: %w", err)
+	}
+	if err := assignAcronymCategories(ctx, tx, acronym.ID, acronym.CategoryIDs, false); err != nil {
+		return err
+	}
+	if err := loadAcronymCategories(ctx, tx, []*Acronym{acronym}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit acronym creation: %w", err)
 	}
 	return nil
 }
@@ -166,7 +276,13 @@ func (s *PGAcronymStore) Create(ctx context.Context, acronym *Acronym) error {
 // Update modifies an existing acronym's definition and link
 // Returns an error if the acronym doesn't exist (no rows affected)
 func (s *PGAcronymStore) Update(ctx context.Context, acronym *Acronym) error {
-	err := s.pool.QueryRow(ctx,
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin acronym update: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx,
 		`UPDATE acronyms
 		 SET definition = $1, link = $2, updated_at = NOW()
 		 WHERE id = $3
@@ -174,7 +290,6 @@ func (s *PGAcronymStore) Update(ctx context.Context, acronym *Acronym) error {
 		strings.TrimSpace(acronym.Definition),
 		acronym.Link,
 		acronym.ID).Scan(&acronym.UpdatedAt)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("acronym not found")
@@ -184,7 +299,17 @@ func (s *PGAcronymStore) Update(ctx context.Context, acronym *Acronym) error {
 		}
 		return fmt.Errorf("failed to update acronym: %w", err)
 	}
-
+	if acronym.CategoriesSpecified {
+		if err := assignAcronymCategories(ctx, tx, acronym.ID, acronym.CategoryIDs, true); err != nil {
+			return err
+		}
+	}
+	if err := loadAcronymCategories(ctx, tx, []*Acronym{acronym}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit acronym update: %w", err)
+	}
 	return nil
 }
 

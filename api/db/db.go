@@ -79,6 +79,33 @@ func (database *DB) CreateSchema(ctx context.Context) error {
 		return fmt.Errorf("failed to create acronyms table: %w", err)
 	}
 
+	_, err = database.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS categories (
+			id BIGSERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			colour TEXT NOT NULL CHECK (colour IN (
+				'#1976D2', '#00796B', '#388E3C', '#FFA000',
+				'#F57C00', '#D32F2F', '#7B1FA2', '#455A64'
+			)),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create categories table: %w", err)
+	}
+
+	_, err = database.pool.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS acronym_categories (
+			acronym_id BIGINT NOT NULL REFERENCES acronyms(id) ON DELETE CASCADE,
+			category_id BIGINT NOT NULL REFERENCES categories(id),
+			PRIMARY KEY (acronym_id, category_id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create acronym category table: %w", err)
+	}
+
 	// Create an index on the lowercase version of acronym for case-insensitive lookups
 	_, err = database.pool.Exec(ctx, `
 		CREATE INDEX IF NOT EXISTS idx_acronyms_acronym ON acronyms(LOWER(acronym))
@@ -101,6 +128,22 @@ func (database *DB) CreateSchema(ctx context.Context) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create acronym meaning constraint: %w", err)
+	}
+
+	_, err = database.pool.Exec(ctx, `
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name
+		ON categories(LOWER(name))
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create category name index: %w", err)
+	}
+
+	_, err = database.pool.Exec(ctx, `
+		CREATE INDEX IF NOT EXISTS idx_acronym_categories_category
+		ON acronym_categories(category_id, acronym_id)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create category association index: %w", err)
 	}
 
 	return nil

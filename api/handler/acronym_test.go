@@ -77,13 +77,16 @@ func TestCreateAcronym(t *testing.T) {
 	t.Run("successful creation", func(t *testing.T) {
 		store := &mockAcronymStore{
 			createFunc: func(ctx context.Context, acronym *model.Acronym) error {
+				if len(acronym.CategoryIDs) != 2 || acronym.CategoryIDs[0] != 3 || acronym.CategoryIDs[1] != 1 {
+					t.Fatalf("Unexpected category IDs: %#v", acronym.CategoryIDs)
+				}
 				acronym.ID = 1
 				return nil
 			},
 		}
 		h, e := setupTestHandler(store)
 
-		reqBody := `{"acronym":"API","definition":"Application Programming Interface"}`
+		reqBody := `{"acronym":"API","definition":"Application Programming Interface","category_ids":[3,1,3]}`
 		req := httptest.NewRequest(http.MethodPost, "/api/acronyms", bytes.NewBufferString(reqBody))
 		req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 		rec := httptest.NewRecorder()

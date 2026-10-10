@@ -55,7 +55,7 @@ func setupTestDB(t *testing.T) *pgxpool.Pool {
 	}
 
 	// Clean up any existing data before running tests
-	_, err = pool.Exec(ctx, "TRUNCATE TABLE acronyms RESTART IDENTITY CASCADE")
+	_, err = pool.Exec(ctx, "TRUNCATE TABLE acronyms, categories RESTART IDENTITY CASCADE")
 	if err != nil {
 		pool.Close()
 		t.Fatalf("Failed to truncate test table: %v", err)

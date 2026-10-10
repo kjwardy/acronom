@@ -1,6 +1,7 @@
 import axios from 'axios';
 import {
   isSafeResultLink,
+  mergeCreatedAcronymResult,
   removeAcronymResult,
   replaceAcronymResult,
   searchAcronyms,
@@ -47,6 +48,35 @@ describe('removeAcronymResult', () => {
     ];
 
     expect(removeAcronymResult(results, 1)).toEqual([results[1]]);
+  });
+});
+
+describe('mergeCreatedAcronymResult', () => {
+  const results = [
+    { id: 1, acronym: 'API', definition: 'Application Programming Interface' },
+  ];
+
+  it('adds matching entries using search result ordering', () => {
+    const created = {
+      id: 2,
+      acronym: 'API Gateway',
+      definition: 'A managed API entry point',
+    };
+
+    expect(mergeCreatedAcronymResult(results, created, 'api')).toEqual([
+      results[0],
+      created,
+    ]);
+  });
+
+  it('does not add entries that do not match the active query', () => {
+    const created = {
+      id: 2,
+      acronym: 'SDK',
+      definition: 'Software Development Kit',
+    };
+
+    expect(mergeCreatedAcronymResult(results, created, 'api')).toBe(results);
   });
 });
 
